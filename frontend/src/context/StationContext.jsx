@@ -3,9 +3,31 @@ import polarisApi from '../services/api';
 
 const StationContext = createContext(null);
 
+const ROUTE_MAP = {
+  home: '/',
+  dashboard: '/dashboard',
+  environmental: '/environment',
+  energy: '/energy',
+  infrastructure: '/infrastructure',
+  logistics: '/logistics',
+  alerts: '/alerts',
+};
+
+const getPageFromPath = (path) => {
+  const clean = path.toLowerCase().replace(/^\/+|\/+$/g, '');
+  if (!clean || clean === 'home') return 'home';
+  if (clean === 'dashboard') return 'dashboard';
+  if (clean === 'environment' || clean === 'environmental') return 'environmental';
+  if (clean === 'energy') return 'energy';
+  if (clean === 'infrastructure') return 'infrastructure';
+  if (clean === 'logistics') return 'logistics';
+  if (clean === 'alerts') return 'alerts';
+  return 'home';
+};
+
 export const StationProvider = ({ children }) => {
   const [selectedStation, setSelectedStation] = useState('Maitri');
-  const [currentPage, setCurrentPage] = useState('dashboard');
+  const [currentPage, setCurrentPageState] = useState(() => getPageFromPath(window.location.pathname));
   const [stationInfo, setStationInfo] = useState(null);
   const [latestObservation, setLatestObservation] = useState(null);
   const [recentObservations, setRecentObservations] = useState([]);
@@ -13,6 +35,26 @@ export const StationProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [backendHealthy, setBackendHealthy] = useState(null);
+
+  // Sync state with URL history
+  const setCurrentPage = useCallback((page) => {
+    setCurrentPageState(page);
+    const targetUrl = ROUTE_MAP[page] || '/';
+    if (window.location.pathname !== targetUrl) {
+      window.history.pushState({ page }, '', targetUrl);
+    }
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, []);
+
+  // Listen to browser Back/Forward navigation
+  useEffect(() => {
+    const handlePopState = () => {
+      const page = getPageFromPath(window.location.pathname);
+      setCurrentPageState(page);
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
 
   const checkHealth = useCallback(async () => {
     try {
