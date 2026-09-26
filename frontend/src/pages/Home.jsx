@@ -629,7 +629,7 @@ export const Home = () => {
         <div className="exact-disclaimer-box">
           <Database size={20} style={{ flexShrink: 0 }} />
           <div>
-            <strong>Latest available observation in loaded dataset.</strong> This dataset represents historical observations and does not represent live station telemetry.
+            Latest available observation in loaded dataset. This dataset represents historical observations and does not represent live station telemetry.
           </div>
         </div>
       </section>
