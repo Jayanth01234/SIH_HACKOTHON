@@ -1,0 +1,55 @@
+{
+  "station": "Maitri",
+  "model_type": "RandomForestClassifier",
+  "n_estimators": 100,
+  "split_strategy": "Chronological 80/20 (No temporal shuffle)",
+  "train_range": [
+    "2021-01-01T00:00:00",
+    "2023-05-26T03:00:00"
+  ],
+  "test_range": [
+    "2023-05-26T04:00:00",
+    "2023-12-30T23:00:00"
+  ],
+  "train_samples": 21004,
+  "test_samples": 5252,
+  "thresholds": {
+    "wind_speed_p95_ms": 15.16,
+    "temp_drop_threshold_c": -5.0,
+    "forecast_lead_hours": 24
+  },
+  "metrics": {
+    "accuracy": 0.6929,
+    "precision": 0.553,
+    "recall": 0.4792,
+    "f1_score": 0.5134,
+    "confusion_matrix": [
+      [
+        2788,
+        688
+      ],
+      [
+        925,
+        851
+      ]
+    ]
+  },
+  "feature_importances": {
+    "wind_mean_3d": 0.1767,
+    "temperature_mean_3d": 0.1702,
+    "wind_delta": 0.1574,
+    "wind_trend_3d": 0.1518,
+    "temperature_delta": 0.1262,
+    "temperature_trend_3d": 0.1097,
+    "pressure_trend": 0.1081
+  },
+  "feature_descriptions": {
+    "wind_mean_3d": "Sustained rolling average wind velocity",
+    "temperature_mean_3d": "Baseline ambient temperature trend",
+    "wind_trend_3d": "Rate of acceleration in wind speed",
+    "temperature_trend_3d": "Rate of atmospheric cooling or warming",
+    "wind_delta": "24-hour gust acceleration delta",
+    "temperature_delta": "24-hour thermal change / cold front intrusion",
+    "pressure_trend": "Rate of barometric pressure change"
+  }
+}

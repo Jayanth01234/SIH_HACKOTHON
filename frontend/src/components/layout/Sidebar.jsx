@@ -1,6 +1,5 @@
 import React from 'react';
 import {
-  Home as HomeIcon,
   LayoutDashboard,
   Wind,
   Zap,
@@ -13,7 +12,6 @@ import {
 import { useStation } from '../../context/StationContext';
 
 const NAV_ITEMS = [
-  { id: 'home', label: 'Home Portal', icon: HomeIcon },
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { id: 'environmental', label: 'Environmental Monitoring', icon: Wind },
   { id: 'energy', label: 'Energy Monitoring', icon: Zap },
@@ -28,12 +26,7 @@ export const Sidebar = () => {
   return (
     <aside className="sidebar">
       {/* Brand Header */}
-      <div
-        className="sidebar-header"
-        style={{ cursor: 'pointer' }}
-        onClick={() => setCurrentPage('home')}
-        title="Return to Home Landing Page"
-      >
+      <div className="sidebar-header">
         <div className="sidebar-logo-icon">
           <Compass size={22} strokeWidth={2.4} />
         </div>
@@ -45,7 +38,7 @@ export const Sidebar = () => {
 
       {/* Navigation Links */}
       <div className="sidebar-nav">
-        <div className="nav-section-title">Navigation &amp; Operations</div>
+        <div className="nav-section-title">Operations & Digital Twin</div>
         {NAV_ITEMS.map((item) => {
           const Icon = item.icon;
           const isActive = currentPage === item.id;

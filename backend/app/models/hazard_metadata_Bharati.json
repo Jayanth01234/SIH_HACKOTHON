@@ -1,0 +1,55 @@
+{
+  "station": "Bharati",
+  "model_type": "RandomForestClassifier",
+  "n_estimators": 100,
+  "split_strategy": "Chronological 80/20 (No temporal shuffle)",
+  "train_range": [
+    "2021-01-01T00:00:00",
+    "2023-05-26T03:00:00"
+  ],
+  "test_range": [
+    "2023-05-26T04:00:00",
+    "2023-12-30T23:00:00"
+  ],
+  "train_samples": 21004,
+  "test_samples": 5252,
+  "thresholds": {
+    "wind_speed_p95_ms": 10.77,
+    "temp_drop_threshold_c": -5.0,
+    "forecast_lead_hours": 24
+  },
+  "metrics": {
+    "accuracy": 0.8107,
+    "precision": 0.4447,
+    "recall": 0.4053,
+    "f1_score": 0.4241,
+    "confusion_matrix": [
+      [
+        3892,
+        457
+      ],
+      [
+        537,
+        366
+      ]
+    ]
+  },
+  "feature_importances": {
+    "wind_mean_3d": 0.2089,
+    "temperature_mean_3d": 0.1706,
+    "temperature_trend_3d": 0.1513,
+    "temperature_delta": 0.1372,
+    "wind_delta": 0.1191,
+    "wind_trend_3d": 0.1066,
+    "pressure_trend": 0.1064
+  },
+  "feature_descriptions": {
+    "wind_mean_3d": "Sustained rolling average wind velocity",
+    "temperature_mean_3d": "Baseline ambient temperature trend",
+    "wind_trend_3d": "Rate of acceleration in wind speed",
+    "temperature_trend_3d": "Rate of atmospheric cooling or warming",
+    "wind_delta": "24-hour gust acceleration delta",
+    "temperature_delta": "24-hour thermal change / cold front intrusion",
+    "pressure_trend": "Rate of barometric pressure change"
+  }
+}

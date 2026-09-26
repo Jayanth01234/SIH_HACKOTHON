@@ -8,7 +8,6 @@ import Header from './components/layout/Header';
 import FooterDisclaimer from './components/common/FooterDisclaimer';
 
 // Pages
-import Home from './pages/Home';
 import Dashboard from './pages/Dashboard';
 import EnvironmentalMonitoring from './pages/EnvironmentalMonitoring';
 import EnergyMonitoring from './pages/EnergyMonitoring';
@@ -36,29 +35,17 @@ const PageContent = () => {
   }
 };
 
-const MainLayout = () => {
-  const { currentPage } = useStation();
-
-  if (currentPage === 'home') {
-    return <Home />;
-  }
-
-  return (
-    <div className="app-container">
-      <Sidebar />
-      <main className="main-content">
-        <Header />
-        <PageContent />
-        <FooterDisclaimer />
-      </main>
-    </div>
-  );
-};
-
 export const App = () => {
   return (
     <StationProvider>
-      <MainLayout />
+      <div className="app-container">
+        <Sidebar />
+        <main className="main-content">
+          <Header />
+          <PageContent />
+          <FooterDisclaimer />
+        </main>
+      </div>
     </StationProvider>
   );
 };
