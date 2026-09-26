@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Thermometer,
   Wind,
@@ -12,6 +12,11 @@ import {
   ArrowUpRight,
   ShieldCheck,
   Clock,
+  RefreshCw,
+  AlertTriangle,
+  BrainCircuit,
+  Activity,
+  ExternalLink,
 } from 'lucide-react';
 import {
   ResponsiveContainer,
@@ -25,6 +30,7 @@ import {
 } from 'recharts';
 import { useStation } from '../context/StationContext';
 import Sparkline from '../components/common/Sparkline';
+import polarisApi from '../services/api';
 
 export const Dashboard = () => {
   const {
@@ -35,6 +41,65 @@ export const Dashboard = () => {
     stationInfo,
     setCurrentPage,
   } = useStation();
+
+  // 1. Live Telemetry state
+  const [liveData, setLiveData] = useState(null);
+  const [liveLoading, setLiveLoading] = useState(false);
+
+  // 2. AI Forecast state
+  const [forecastData, setForecastData] = useState(null);
+  const [forecastLoading, setForecastLoading] = useState(false);
+
+  // 3. ML Hazard Prediction state
+  const [hazardData, setHazardData] = useState(null);
+  const [hazardLoading, setHazardLoading] = useState(false);
+
+  // Fetch Live Telemetry using getLiveStationData / refreshLiveStationData
+  const fetchLive = useCallback(async (isRefresh = false) => {
+    setLiveLoading(true);
+    try {
+      const data = isRefresh
+        ? await polarisApi.refreshLiveStationData(selectedStation)
+        : await polarisApi.getLiveStationData(selectedStation);
+      setLiveData(data);
+    } catch (err) {
+      console.warn('Could not fetch live telemetry:', err);
+    } finally {
+      setLiveLoading(false);
+    }
+  }, [selectedStation]);
+
+  // Fetch AI Forecast using getStationForecast
+  const fetchForecast = useCallback(async () => {
+    setForecastLoading(true);
+    try {
+      const data = await polarisApi.getStationForecast(selectedStation);
+      setForecastData(data);
+    } catch (err) {
+      console.warn('Could not fetch forecast:', err);
+    } finally {
+      setForecastLoading(false);
+    }
+  }, [selectedStation]);
+
+  // Fetch ML Hazard Prediction using getStationHazard
+  const fetchHazard = useCallback(async () => {
+    setHazardLoading(true);
+    try {
+      const data = await polarisApi.getStationHazard(selectedStation);
+      setHazardData(data);
+    } catch (err) {
+      console.warn('Could not fetch hazard prediction:', err);
+    } finally {
+      setHazardLoading(false);
+    }
+  }, [selectedStation]);
+
+  useEffect(() => {
+    fetchLive(false);
+    fetchForecast();
+    fetchHazard();
+  }, [fetchLive, fetchForecast, fetchHazard]);
 
   const tempSpark = recentObservations.map((o) => o.temperature).slice(-20);
   const windSpark = recentObservations.map((o) => o.wind_speed).slice(-20);
@@ -51,6 +116,19 @@ export const Dashboard = () => {
       Humidity: obs.relative_humidity,
     };
   });
+
+  // 24-Hour Projected Horizon for Forecast Chart
+  const forecastChartData = forecastData?.hourly_projection?.map((pt) => {
+    const d = new Date(pt.timestamp);
+    const timeLabel = `+${pt.step_hours}h (${String(d.getUTCHours()).padStart(2, '0')}:00)`;
+    return {
+      time: timeLabel,
+      'Forecast Temp (°C)': pt.temperature,
+      'Temp CI Low': pt.temp_ci_lower,
+      'Temp CI High': pt.temp_ci_upper,
+      'Forecast Wind (m/s)': pt.wind_speed,
+    };
+  }) || [];
 
   const latestTimeStr = latestObservation?.timestamp
     ? new Date(latestObservation.timestamp).toLocaleString('en-US', {
@@ -75,6 +153,28 @@ export const Dashboard = () => {
     },
   }[selectedStation] || {};
 
+  const getHazardColor = (level) => {
+    if (level === 'CRITICAL') return { bg: '#FEF2F2', text: '#991B1B', bar: '#EF4444', border: '#FECACA' };
+    if (level === 'MODERATE') return { bg: '#FFFBEB', text: '#92400E', bar: '#F59E0B', border: '#FDE68A' };
+    return { bg: '#ECFDF5', text: '#065F46', bar: '#10B981', border: '#A7F3D0' };
+  };
+
+  const hazardColors = getHazardColor(hazardData?.hazard_level);
+
+  // Status badge display for live data
+  const getLiveStatusBadge = () => {
+    if (!liveData) return { label: 'CONNECTING...', class: 'tag-prototype', beacon: '' };
+    if (liveData.status === 'verified_live') {
+      return { label: 'VERIFIED LIVE NCPOR DATA', class: 'tag-verified-live', beacon: 'beacon-live' };
+    }
+    if (liveData.status === 'stale') {
+      return { label: 'STALE — LAST VERIFIED OBSERVATION', class: 'tag-ml-hazard', beacon: 'beacon-stale' };
+    }
+    return { label: 'UNAVAILABLE', class: 'tag-prototype', beacon: '' };
+  };
+
+  const liveBadge = getLiveStatusBadge();
+
   return (
     <div className="page-container">
       {/* Station Hero Card */}
@@ -83,7 +183,7 @@ export const Dashboard = () => {
           <h2>{selectedStation} Research Station, Antarctica</h2>
           <p>
             Digital Twin & Remote Telemetry Operations Center • National Centre for Polar and Ocean Research
-            (NCPOR). Monitoring environmental life support, microgrid power, and scientific systems.
+            (NCPOR). Continuous environmental life support, microgrid power, and scientific operations.
           </p>
           <div className="station-hero-badges">
             <span className="hero-pill">
@@ -96,7 +196,7 @@ export const Dashboard = () => {
             </span>
             <span className="hero-pill">
               <ShieldCheck size={13} style={{ color: '#34D399' }} />
-              <span>Commissioned {stationMeta.commissioned} • 34th ISEA Expedition</span>
+              <span>Commissioned {stationMeta.commissioned} • Operational</span>
             </span>
           </div>
         </div>
@@ -110,6 +210,134 @@ export const Dashboard = () => {
             <div className="stat-num">100%</div>
             <div className="stat-lbl">Validated Telemetry</div>
           </div>
+        </div>
+      </div>
+
+      {/* SECTION 1: LIVE NCPOR TELEMETRY */}
+      <div className="live-telemetry-banner">
+        <div className="live-banner-header">
+          <div className="live-banner-title-group">
+            <span className={`pulsing-beacon ${liveBadge.beacon}`} />
+            <span className={`provenance-tag ${liveBadge.class}`}>
+              {liveBadge.label}
+            </span>
+            <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--polar-navy)' }}>
+              Source: National Polar Data Center (NCPOR)
+            </span>
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            {liveData?.observation_time && (
+              <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
+                Observation Time: <strong>{new Date(liveData.observation_time).toLocaleString()}</strong>
+              </span>
+            )}
+            <a
+              href={liveData?.source_url || `https://data.ncpor.res.in/${selectedStation.toLowerCase()}/live`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="btn btn-outline btn-sm"
+              style={{ fontSize: '11px', display: 'flex', alignItems: 'center', gap: '4px' }}
+            >
+              <ExternalLink size={12} /> NCPOR Portal
+            </a>
+            <button
+              onClick={() => fetchLive(true)}
+              disabled={liveLoading}
+              className="btn btn-primary btn-sm"
+              style={{ fontSize: '11px', display: 'flex', alignItems: 'center', gap: '4px' }}
+            >
+              <RefreshCw size={12} className={liveLoading ? 'spin' : ''} />
+              {liveLoading ? 'Streaming...' : 'Refresh Live'}
+            </button>
+          </div>
+        </div>
+
+        {liveData?.status === 'verified_live' || liveData?.status === 'stale' ? (
+          <div className="live-metrics-grid">
+            <div className="live-metric-box">
+              <span className="live-metric-label">Temperature</span>
+              <span className="live-metric-val">
+                {liveData?.temperature !== null && liveData?.temperature !== undefined
+                  ? `${Number(liveData.temperature).toFixed(1)} °C`
+                  : '--'}
+              </span>
+              <span className="live-metric-sub">
+                {liveData?.status === 'stale' ? 'Last Verified Value' : 'Ambient Air Sensor'}
+              </span>
+            </div>
+
+            <div className="live-metric-box">
+              <span className="live-metric-label">Wind Speed</span>
+              <span className="live-metric-val">
+                {liveData?.wind_speed_ms !== null && liveData?.wind_speed_ms !== undefined
+                  ? `${Number(liveData.wind_speed_ms).toFixed(1)} m/s`
+                  : '--'}
+              </span>
+              <span className="live-metric-sub">
+                {liveData?.wind_speed_knots !== null && liveData?.wind_speed_knots !== undefined
+                  ? `(${Number(liveData.wind_speed_knots).toFixed(1)} knots)`
+                  : 'Anemometer'}
+              </span>
+            </div>
+
+            <div className="live-metric-box">
+              <span className="live-metric-label">Atmospheric Pressure</span>
+              <span className="live-metric-val">
+                {liveData?.atmospheric_pressure !== null && liveData?.atmospheric_pressure !== undefined
+                  ? `${Number(liveData.atmospheric_pressure).toFixed(1)} hPa`
+                  : '--'}
+              </span>
+              <span className="live-metric-sub">Barometric Sensor</span>
+            </div>
+
+            <div className="live-metric-box">
+              <span className="live-metric-label">Relative Humidity</span>
+              <span className="live-metric-val">
+                {liveData?.relative_humidity !== null && liveData?.relative_humidity !== undefined
+                  ? `${Number(liveData.relative_humidity).toFixed(1)} %`
+                  : '--'}
+              </span>
+              <span className="live-metric-sub">Hygrometer Sensor</span>
+            </div>
+          </div>
+        ) : (
+          <div style={{ fontSize: '13px', color: 'var(--text-secondary)', padding: '12px 4px' }}>
+            Live NCPOR telemetry currently unavailable.
+          </div>
+        )}
+      </div>
+
+      {/* SECTION: VERIFIED HISTORICAL NCPOR / NPDC DATA */}
+      <div
+        style={{
+          background: '#EFF6FF',
+          border: '1px solid #BFDBFE',
+          borderRadius: 'var(--radius-md)',
+          padding: '10px 16px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          fontSize: '12px',
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <Clock size={15} style={{ color: 'var(--polar-ice)' }} />
+          <span>
+            <strong>Historical Verified AWS Baseline (Observed Data):</strong> {latestTimeStr}
+          </span>
+          <span className="provenance-tag tag-verified-historical">
+            [ VERIFIED HISTORICAL NCPOR / NPDC DATA ]
+          </span>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <button
+            onClick={() => setCurrentPage('environmental')}
+            className="btn btn-primary btn-sm"
+            style={{ fontSize: '11px', padding: '4px 8px' }}
+          >
+            Open Full Telemetry <ArrowUpRight size={12} />
+          </button>
         </div>
       </div>
 
@@ -216,35 +444,208 @@ export const Dashboard = () => {
         </div>
       </div>
 
-      {/* Dataset timestamp notification */}
-      <div
-        style={{
-          background: 'var(--bg-ice-subtle)',
-          border: '1px solid #BAE6FD',
-          borderRadius: 'var(--radius-md)',
-          padding: '10px 16px',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          fontSize: '12px',
-        }}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <Clock size={15} style={{ color: 'var(--polar-ice)' }} />
-          <span>
-            <strong>Latest available observation in loaded dataset:</strong> {latestTimeStr}
-          </span>
+      {/* INTELLIGENCE SECTION: AI Forecast + ML Hazard Prediction */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(420px, 1fr))', gap: '20px', margin: '6px 0' }}>
+        
+        {/* SECTION 2: AI FORECAST */}
+        <div className="card">
+          <div className="card-header">
+            <div>
+              <div className="card-title">
+                <BrainCircuit size={17} style={{ color: '#7C3AED' }} />
+                <span>AI FORECAST</span>
+                <span className="provenance-tag tag-ai-forecast">[ AI FORECAST ]</span>
+              </div>
+              <div className="card-subtitle" style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
+                Forecast generated from recent observations using the POLARIS statistical forecasting model. (Prediction, not observation).
+              </div>
+            </div>
+            <button className="btn btn-outline btn-sm" onClick={fetchForecast} disabled={forecastLoading}>
+              <RefreshCw size={12} className={forecastLoading ? 'spin' : ''} />
+            </button>
+          </div>
+
+          <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            {forecastData ? (
+              <>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px' }}>
+                  <div style={{ background: '#F8FAFC', border: '1px solid var(--polar-border)', borderRadius: 'var(--radius-md)', padding: '10px' }}>
+                    <div style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 600 }}>NEXT-HOUR TEMP</div>
+                    <div style={{ fontSize: '18px', fontWeight: 800, color: 'var(--polar-navy)', marginTop: '2px' }}>
+                      {forecastData.temperature.forecast_next_hour} °C
+                    </div>
+                    <div style={{ fontSize: '11px', color: '#0369A1', marginTop: '3px' }}>
+                      95% CI: [{forecastData.temperature.ci_lower}, {forecastData.temperature.ci_upper}]
+                    </div>
+                    <div style={{ fontSize: '10px', color: 'var(--text-muted)' }}>
+                      Trend: {forecastData.temperature.trend_slope > 0 ? '+' : ''}{forecastData.temperature.trend_slope} °C/h
+                    </div>
+                  </div>
+
+                  <div style={{ background: '#F8FAFC', border: '1px solid var(--polar-border)', borderRadius: 'var(--radius-md)', padding: '10px' }}>
+                    <div style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 600 }}>NEXT-HOUR WIND</div>
+                    <div style={{ fontSize: '18px', fontWeight: 800, color: '#16A34A', marginTop: '2px' }}>
+                      {forecastData.wind_speed.forecast_next_hour} m/s
+                    </div>
+                    <div style={{ fontSize: '11px', color: '#16A34A', marginTop: '3px' }}>
+                      95% CI: [{forecastData.wind_speed.ci_lower}, {forecastData.wind_speed.ci_upper}]
+                    </div>
+                    <div style={{ fontSize: '10px', color: 'var(--text-muted)' }}>
+                      Trend: {forecastData.wind_speed.trend_slope > 0 ? '+' : ''}{forecastData.wind_speed.trend_slope} m/s²
+                    </div>
+                  </div>
+
+                  <div style={{ background: '#F8FAFC', border: '1px solid var(--polar-border)', borderRadius: 'var(--radius-md)', padding: '10px' }}>
+                    <div style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 600 }}>NEXT-HOUR PRESSURE</div>
+                    <div style={{ fontSize: '18px', fontWeight: 800, color: '#7C3AED', marginTop: '2px' }}>
+                      {forecastData.atmospheric_pressure.forecast_next_hour} hPa
+                    </div>
+                    <div style={{ fontSize: '11px', color: '#7C3AED', marginTop: '3px' }}>
+                      95% CI: [{forecastData.atmospheric_pressure.ci_lower}, {forecastData.atmospheric_pressure.ci_upper}]
+                    </div>
+                    <div style={{ fontSize: '10px', color: 'var(--text-muted)' }}>
+                      Trend: {forecastData.atmospheric_pressure.trend_slope > 0 ? '+' : ''}{forecastData.atmospheric_pressure.trend_slope} hPa/h
+                    </div>
+                  </div>
+                </div>
+
+                {/* 24-Hour Projected Horizon Chart */}
+                <div style={{ height: '170px' }}>
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={forecastChartData} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#F1F5F9" />
+                      <XAxis dataKey="time" stroke="#94A3B8" fontSize={10} tickLine={false} interval={3} />
+                      <YAxis stroke="#0284C7" fontSize={10} unit="°C" />
+                      <Tooltip contentStyle={{ borderRadius: '8px', fontSize: '11px' }} />
+                      <Line type="monotone" dataKey="Forecast Temp (°C)" stroke="#0284C7" strokeWidth={2} dot={{ r: 2 }} />
+                      <Line type="monotone" dataKey="Forecast Wind (m/s)" stroke="#16A34A" strokeWidth={1.5} strokeDasharray="3 3" dot={{ r: 1 }} />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+
+                {/* Backtest MAE / MAPE Strip */}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', background: '#F8FAFC', borderRadius: 'var(--radius-md)', fontSize: '11px', color: 'var(--text-secondary)' }}>
+                  <span><strong>Backtest MAE / MAPE:</strong></span>
+                  <span>Temp MAE: <strong>{forecastData.accuracy_metrics?.mae_temperature ?? '--'} °C</strong></span>
+                  <span>Wind MAE: <strong>{forecastData.accuracy_metrics?.mae_wind_speed ?? '--'} m/s</strong></span>
+                  <span>Evaluations: <strong>{forecastData.accuracy_metrics?.tracked_evaluations} pts</strong></span>
+                </div>
+              </>
+            ) : (
+              <div style={{ padding: '24px', textAlign: 'center', color: 'var(--text-muted)' }}>
+                Calculating explainable statistical forecast...
+              </div>
+            )}
+          </div>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <span className="badge badge-info">Historical NCPOR AWS Data</span>
-          <button
-            onClick={() => setCurrentPage('environmental')}
-            className="btn btn-primary btn-sm"
-            style={{ fontSize: '11px', padding: '4px 8px' }}
-          >
-            Open Full Telemetry <ArrowUpRight size={12} />
-          </button>
+
+        {/* SECTION 3: ML HAZARD PREDICTION */}
+        <div className="card">
+          <div className="card-header">
+            <div>
+              <div className="card-title">
+                <AlertTriangle size={17} style={{ color: '#D97706' }} />
+                <span>ML HAZARD PREDICTION</span>
+                <span className="provenance-tag tag-ml-hazard">[ ML HAZARD PREDICTION ]</span>
+              </div>
+              <div className="card-subtitle" style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
+                Random Forest Classifier • 80/20 Chronological Split on 26,000+ Hourly Antarctic Records (ML Prediction)
+              </div>
+            </div>
+            <button className="btn btn-outline btn-sm" onClick={fetchHazard} disabled={hazardLoading}>
+              <RefreshCw size={12} className={hazardLoading ? 'spin' : ''} />
+            </button>
+          </div>
+
+          <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+            {hazardData ? (
+              <>
+                {/* Risk Gauge Header */}
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    padding: '12px 16px',
+                    background: hazardColors.bg,
+                    border: `1px solid ${hazardColors.border}`,
+                    borderRadius: 'var(--radius-md)',
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <Activity size={20} style={{ color: hazardColors.bar }} />
+                    <div>
+                      <div style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', color: hazardColors.text }}>
+                        24-Hour Hazard Assessment
+                      </div>
+                      <div style={{ fontSize: '18px', fontWeight: 800, color: hazardColors.text }}>
+                        {hazardData.hazard_level} RISK LEVEL ({(hazardData.hazard_probability * 100).toFixed(1)}%)
+                      </div>
+                    </div>
+                  </div>
+
+                  <div style={{ width: '130px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                    <div style={{ height: '8px', background: 'rgba(0,0,0,0.1)', borderRadius: '999px', overflow: 'hidden' }}>
+                      <div
+                        style={{
+                          height: '100%',
+                          width: `${Math.min(100, Math.max(5, hazardData.hazard_probability * 100))}%`,
+                          backgroundColor: hazardColors.bar,
+                          borderRadius: '999px',
+                        }}
+                      />
+                    </div>
+                    <span style={{ fontSize: '10px', color: hazardColors.text, textAlign: 'right' }}>
+                      Probability: {(hazardData.hazard_probability * 100).toFixed(1)}%
+                    </span>
+                  </div>
+                </div>
+
+                {/* Primary Risk Driver Explanation */}
+                <div style={{ fontSize: '12px', background: '#F8FAFC', border: '1px solid var(--polar-border)', padding: '10px 12px', borderRadius: 'var(--radius-md)' }}>
+                  <span style={{ fontWeight: 700, color: 'var(--polar-navy)' }}>Physical Hazard Driver: </span>
+                  <span style={{ color: 'var(--text-secondary)' }}>{hazardData.primary_driver}</span>
+                </div>
+
+                {/* Top Contributing Features */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  <span style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)' }}>
+                    Top Contributing Features (Gini Importance)
+                  </span>
+                  {hazardData.top_contributing_factors.slice(0, 3).map((factor, idx) => (
+                    <div key={idx} className="factor-row">
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px' }}>
+                        <span style={{ fontWeight: 600, color: 'var(--polar-navy)' }}>{factor.factor_label}</span>
+                        <span style={{ color: 'var(--polar-ice)', fontWeight: 700 }}>{factor.importance_pct}% weight</span>
+                      </div>
+                      <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
+                        {factor.impact_description} (Value: {factor.current_value})
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Operational Guidance */}
+                <div style={{ padding: '10px 12px', borderRadius: 'var(--radius-md)', background: '#F0F9FF', border: '1px solid #BAE6FD', fontSize: '11px', color: '#0369A1' }}>
+                  <strong>Operational Protocol: </strong> {hazardData.operational_guidance}
+                </div>
+
+                {/* Model Metadata Transparency */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px', color: 'var(--text-muted)', borderTop: '1px solid var(--polar-border)', paddingTop: '8px' }}>
+                  <span>Test Accuracy: <strong>{(hazardData.model_evaluation.accuracy * 100).toFixed(1)}%</strong></span>
+                  <span>Precision: <strong>{(hazardData.model_evaluation.precision * 100).toFixed(1)}%</strong></span>
+                  <span>Recall: <strong>{(hazardData.model_evaluation.recall * 100).toFixed(1)}%</strong></span>
+                  <span>Test Samples: <strong>{hazardData.model_evaluation.test_samples}</strong></span>
+                </div>
+              </>
+            ) : (
+              <div style={{ padding: '24px', textAlign: 'center', color: 'var(--text-muted)' }}>
+                Evaluating machine learning hazard model...
+              </div>
+            )}
+          </div>
         </div>
+
       </div>
 
       {/* Main Grid: Telemetry Trends + Digital Twin Modules */}
@@ -314,6 +715,7 @@ export const Dashboard = () => {
               <div className="card-title">
                 <Building2 size={16} style={{ color: 'var(--polar-ice)' }} />
                 <span>Station Module & Subsystem Digital Twin</span>
+                <span className="provenance-tag tag-prototype">[ PROTOTYPE / DEMONSTRATION DATA ]</span>
               </div>
               <span className="badge badge-normal">All Subsystems Nominal</span>
             </div>
