@@ -1,0 +1,46 @@
+{
+  "scenario_id": "SEVERE_WEATHER",
+  "title": "Severe Katabatic Storm Front at Maitri Station",
+  "target_station": "Maitri",
+  "duration_seconds": 60,
+  "total_steps": 12,
+  "steps": [
+    {
+      "step": 1,
+      "title": "Baseline Katabatic Wind Build-up",
+      "wind_speed_ms": 14.5,
+      "temperature_c": -14.2,
+      "pressure_hpa": 981.0,
+      "hazard_risk": "MODERATE"
+    },
+    {
+      "step": 4,
+      "title": "System Predicts CRITICAL Blizzard Risk",
+      "wind_speed_ms": 27.6,
+      "temperature_c": -22.4,
+      "pressure_hpa": 962.0,
+      "hazard_risk": "CRITICAL"
+    },
+    {
+      "step": 8,
+      "title": "Automated Mission Alert Dispatched",
+      "alert_id": "ALT-M-901",
+      "severity": "CRITICAL",
+      "title": "Severe Polar Storm Warning — Class 3 Protocol"
+    },
+    {
+      "step": 10,
+      "title": "Operator Acknowledges Alert & Initiates SOP-01",
+      "action": "ACKNOWLEDGE",
+      "sop": "SOP-01 Blizzard Class 3"
+    },
+    {
+      "step": 12,
+      "title": "Front Stabilizes & Digital Twin Recalibrates",
+      "wind_speed_ms": 18.2,
+      "temperature_c": -18.0,
+      "pressure_hpa": 966.5,
+      "status": "NORMAL"
+    }
+  ]
+}

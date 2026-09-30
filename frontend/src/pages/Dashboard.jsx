@@ -30,6 +30,7 @@ import {
 } from 'recharts';
 import { useStation } from '../context/StationContext';
 import Sparkline from '../components/common/Sparkline';
+import DigitalTwinCenterpiece from '../components/digital_twin/DigitalTwinCenterpiece';
 import polarisApi from '../services/api';
 
 export const Dashboard = () => {
@@ -40,6 +41,10 @@ export const Dashboard = () => {
     statistics,
     stationInfo,
     setCurrentPage,
+    digitalTwinState,
+    activeAlerts,
+    handleAcknowledgeAlert,
+    operatorActions,
   } = useStation();
 
   // 1. Live Telemetry state
@@ -211,6 +216,14 @@ export const Dashboard = () => {
             <div className="stat-lbl">Validated Telemetry</div>
           </div>
         </div>
+      </div>
+
+      {/* OPERATIONAL DIGITAL TWIN VISUAL CENTERPIECE */}
+      <div style={{ marginBottom: '24px' }}>
+        <DigitalTwinCenterpiece
+          twin={digitalTwinState}
+          onSelectSubsystem={(page) => setCurrentPage(page)}
+        />
       </div>
 
       {/* SECTION 1: LIVE NCPOR TELEMETRY */}
@@ -865,6 +878,136 @@ export const Dashboard = () => {
                 </tbody>
               </table>
             </div>
+          </div>
+        </div>
+      </div>
+
+      {/* SECTION: ACTIVE OPERATIONAL ALERTS & MISSION AUDIT TIMELINE */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(420px, 1fr))', gap: '20px', marginTop: '24px' }}>
+        {/* Active Alerts Panel */}
+        <div className="card">
+          <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div className="card-title" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <AlertTriangle size={17} color="#EF4444" />
+              <span>Active Prioritized Alerts ({activeAlerts?.length || 0})</span>
+            </div>
+            <button
+              className="btn btn-outline btn-sm"
+              onClick={() => setCurrentPage('alerts')}
+            >
+              Open Alert Center
+            </button>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginTop: '12px' }}>
+            {activeAlerts && activeAlerts.length > 0 ? (
+              activeAlerts.map((al) => (
+                <div
+                  key={al.id}
+                  style={{
+                    padding: '12px 14px',
+                    borderRadius: 'var(--radius-md)',
+                    borderLeft: `4px solid ${al.severity === 'CRITICAL' ? '#EF4444' : (al.severity === 'HIGH' ? '#F97316' : '#F59E0B')}`,
+                    background: 'var(--bg-ice-subtle)',
+                  }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--polar-navy)' }}>
+                      {al.title}
+                    </div>
+                    <span
+                      style={{
+                        fontSize: '10px',
+                        fontWeight: 700,
+                        padding: '1px 6px',
+                        borderRadius: '4px',
+                        background: al.severity === 'CRITICAL' ? '#FEE2E2' : '#FEF3C7',
+                        color: al.severity === 'CRITICAL' ? '#991B1B' : '#92400E',
+                      }}
+                    >
+                      {al.severity}
+                    </span>
+                  </div>
+                  <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '4px' }}>
+                    {al.description}
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '8px' }}>
+                    <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                      Affects: {(al.affected_systems || []).slice(0, 2).join(', ')}
+                    </span>
+                    <button
+                      className="btn btn-sm btn-primary"
+                      style={{ fontSize: '11px', padding: '3px 8px' }}
+                      onClick={() => {
+                        const note = window.prompt(`Enter operational response notes for ${al.id}:`, 'Reviewed station readiness and SOP checklist.');
+                        if (note) handleAcknowledgeAlert(al.id, note);
+                      }}
+                    >
+                      Acknowledge
+                    </button>
+                  </div>
+                </div>
+              ))
+            ) : (
+              <div style={{ textAlign: 'center', padding: '24px', color: 'var(--text-muted)', fontSize: '13px' }}>
+                All station subsystems within nominal limits. Zero active alerts.
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Operator Action Event Timeline */}
+        <div className="card">
+          <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div className="card-title" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <Clock size={17} color="var(--polar-ice)" />
+              <span>Operational Event Audit Timeline</span>
+            </div>
+            <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Immutable Log</span>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '12px', maxHeight: '280px', overflowY: 'auto' }}>
+            {operatorActions && operatorActions.length > 0 ? (
+              operatorActions.map((act) => (
+                <div
+                  key={act.id}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'flex-start',
+                    gap: '10px',
+                    padding: '8px 10px',
+                    borderBottom: '1px solid var(--border-color)',
+                    fontSize: '12px',
+                  }}
+                >
+                  <span
+                    style={{
+                      padding: '2px 6px',
+                      borderRadius: '4px',
+                      background: act.action === 'ACKNOWLEDGE' ? '#ECFDF5' : '#EFF6FF',
+                      color: act.action === 'ACKNOWLEDGE' ? '#065F46' : '#1E40AF',
+                      fontWeight: 700,
+                      fontSize: '10px',
+                    }}
+                  >
+                    {act.action}
+                  </span>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontWeight: 600, color: 'var(--polar-navy)' }}>
+                      {act.operator}
+                    </div>
+                    <div style={{ color: 'var(--text-secondary)', fontSize: '11px' }}>
+                      {act.notes || 'Routine telemetry check verified'}
+                    </div>
+                  </div>
+                  <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>
+                    {new Date(act.timestamp).toUTCString().slice(17, 22)} UTC
+                  </span>
+                </div>
+              ))
+            ) : (
+              <div style={{ textAlign: 'center', padding: '24px', color: 'var(--text-muted)', fontSize: '13px' }}>
+                No recent operator interventions logged.
+              </div>
+            )}
           </div>
         </div>
       </div>
